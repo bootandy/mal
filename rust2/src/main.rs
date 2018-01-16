@@ -33,7 +33,7 @@ fn read(s: &str) -> Vec<reader::Token> {
 
 fn rep(s: &str) -> String {
     let ss = read(s);
-    println!("{:?}", ss);
+    //println!("{:?}", ss);
     print(ss)
 }
 

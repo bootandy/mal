@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use reader::regex::Captures;
 
 extern crate regex;
 
@@ -46,16 +47,26 @@ pub enum Token {
 
 pub fn read_str(s :&str) -> Vec<Token> {
     let mut t = tokenizer(s);
-    read_form(&mut t)
+    read_form(&mut t, "")
 }
 
-pub fn read_form(r: &mut Reader) -> Vec<Token> {
+pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
     let mut result = vec![];
-    while r.peek() != None && r.peek().unwrap() != ")" {
+    while r.peek() != None && r.peek().unwrap() != close_char {
         result.push( 
             if r.peek().unwrap() == "(" {
                 r.next();
-                let to_add = Token::List(read_form(r));
+                let to_add = Token::List(read_form(r, ")"));
+                r.next();
+                to_add
+            } else if r.peek().unwrap() == "{" {
+                r.next();
+                let to_add = Token::HashMap(read_form(r, "}"));
+                r.next();
+                to_add
+            } else if r.peek().unwrap() == "[" {
+                r.next();
+                let to_add = Token::Vector(read_form(r, "]"));
                 r.next();
                 to_add
             } else {
@@ -97,35 +108,68 @@ fn _read_atom(s: &str) -> Token {
     }
 }
 
-pub fn tokenizer(s: &str) -> Reader {
-    let r = regex!(r###"[\s,]*(~@|[\[\]{}()"`~^@]|"(?:\\.|[^\\"])*"|;.*|[^\s\[\]{}('"`,;)]*)"###);
-    let kill_comma = regex!(r",");
-    let mut result = vec![];
-    for i in r.find_iter(s) {
-        let val = i.as_str();
-        let no_comma = kill_comma.replace_all(val, "");
-        result.push(String::from(no_comma.trim()));
+fn update_state<'a>(s :&'a str, match_point : &Captures<'a>) -> (&'a str, &'a str) {
+    let new_s = &s[match_point.get(1).unwrap().end()..];
+    let to_add = match_point.get(1).unwrap().as_str();
+    (new_s, to_add) 
+}
+
+pub fn tokenizer(s_in: &str) -> Reader {
+    let mut s = &s_in[0..];
+    let brackets = regex!(r###"^[\s,]*([\(\)\{\}\[\]])[\s,]*"###);
+    let digits = regex!(r"^[\s,]*(-?\d+)");
+    let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-\\])"); //{} is greedy to detect ** instead of: *
+    let alphas = regex!(r###"^[\s,]*([\w\d:"-]+)"###);
+    let mut tokens = vec![];
+
+    while s.len() > 0 {
+        let rb = brackets.captures(s);
+
+        tokens.push( String::from(
+            match rb {
+                Some(bracket) => {
+                    let (ss, res) = update_state(s, &bracket);
+                    s = ss;
+                    res
+                },
+                _ => {
+                    let a_number = digits.captures(s);
+                    match a_number {
+                        Some(n) => {
+                            let (ss, res) = update_state(s, &n);
+                            s = ss;
+                            res
+                        },
+                        _ => {
+                            let a_symbol = operands.captures(s);
+                            match a_symbol {
+                                Some(sym) => {
+                                    let (ss, res) = update_state(s, &sym);
+                                    s = ss;
+                                    res
+                                },
+                                _ => {
+                                    let a_other = alphas.captures(s);
+                                    match a_other {
+                                        Some(alp) => {
+                                            let (ss, res) = update_state(s, &alp);
+                                            s = ss;
+                                            res
+                                        },
+                                        _ => {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ));
     }
 
-    // The above super regex doesn't split out operators from operands
-    // We do that here:
-    let is_op = regex!(r"^[\+\*/\-]");
-    let is_negative_number = regex!(r"^[\-]\s*\d+");
-    let mut result2 = vec![];
-
-    for r in result.iter() {
-        let mut r2 :String = r.chars().skip(0).collect();
-        while is_op.is_match(&r2) && !is_negative_number.is_match(&r2) {
-            let first_char : String = r2.chars().take(1).collect();
-            result2.push(String::from(first_char));
-            r2 = r2.chars().skip(1).collect();
-        }
-
-        if r2 != "" {
-            result2.push(r2);
-        }
-    }
-    Reader{tokens: result2, position: 0}
+    Reader{tokens: tokens, position: 0}
 }
 
 
@@ -135,8 +179,10 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("34,4").tokens, vec!["34", "4"]);
     assert_eq!(tokenizer("* 34 -4").tokens, vec!["*", "34", "-4"]);
     assert_eq!(tokenizer("*-34 4").tokens, vec!["*", "-34", "4"]);
-    assert_eq!(tokenizer("** 1 2").tokens, vec!["*", "*", "1", "2"]);
+    assert_eq!(tokenizer("** 1 2").tokens, vec!["**", "1", "2"]);
     assert_eq!(tokenizer("(1 2, 3,,,,),,").tokens, vec!["(", "1", "2", "3", ")"]);
+    assert_eq!(tokenizer("abc").tokens, vec!["abc"]);
+    assert_eq!(tokenizer("\"abc (hi)\"").tokens, vec!["\"abc (hi)\""]);
 }
 
 #[test]
