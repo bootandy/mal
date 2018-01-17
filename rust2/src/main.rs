@@ -62,6 +62,11 @@ fn test_kw() {
 }
 
 #[test]
+fn test_parans() {
+    assert_eq!(rep("abc (with parans)"), "abc (with parans)");
+}
+
+#[test]
 fn test_no_whitespace() {
     assert_eq!(rep("\"abc\""), "\"abc\"");
 }

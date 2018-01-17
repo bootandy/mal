@@ -75,7 +75,7 @@ pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
             }
         )
     }
-    println!("{:?}", result);
+    //println!("{:?}", result);
     result
 }
 
@@ -85,7 +85,7 @@ fn read_atom(reader : &mut Reader) -> Token {
 }
 
 fn _read_atom(s: &str) -> Token {
-    let odd_bit = regex!(r###"['`~(~@)]"###);
+    let odd_bit = regex!(r###"(~@)|['`~]"###);
     if let Some(odd) = odd_bit.find(s) {
         return Token::Odd(odd.as_str().to_string());
     }
@@ -126,8 +126,9 @@ pub fn tokenizer(s_in: &str) -> Reader {
     let digits = regex!(r"^[\s,]*(-?\d+)");
     let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-\\])"); //{} is greedy to detect ** instead of: *
     let alphas = regex!(r###"^[\s,]*([\w\d:"-]+)"###);
-    let strings = regex!(r###"^[\s,]*("((\\")|[^"])+")"###);
-    let odd_shit = regex!(r###"^[\s,]*(['`])"###);
+    let strings = regex!(r###"^[\s,]*("((\\")|[^"])*")"###);
+    let odd_shit = regex!(r###"^[\s,]*((~@)|['`~])"###);
+    let comment = regex!(r###"^[\s,]*(;.*)$"###);
     let mut tokens = vec![];
     let all_regexs = vec![&strings, &brackets, &odd_shit, &digits, &operands, &alphas] ;
 
@@ -135,14 +136,17 @@ pub fn tokenizer(s_in: &str) -> Reader {
 
     while s.len() > 0 && !empty.is_match(s) {
 
+        if let Some(the_comment) = comment.captures(s) {
+            s = &s[the_comment.get(1).unwrap().end()..];
+        } 
         for regex in &all_regexs {
             if let Some(rb) = regex.captures(s) {
-                println!("found with: {:?} {:?}", s, regex);
                 s = update_state(s, &mut tokens, &rb);
                 break
             }
         }
     } 
+    //println!("{:?}", tokens);
     Reader{tokens: tokens, position: 0}
 }
 
@@ -161,6 +165,7 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("\"with \\\" a quote in\"").tokens, vec!["\"with \\\" a quote in\""]);
     assert_eq!(tokenizer("'1").tokens, vec!["'", "1"]);
     assert_eq!(tokenizer("`(1 2)").tokens, vec!["`", "(", "1", "2", ")"]);
+    assert_eq!(tokenizer("1 ;some comment").tokens, vec!["1"]);
 }
 
 #[test]

@@ -6,6 +6,7 @@ pub fn pr_str(tokens: &Vec<reader::Token>) -> String {
     let mut ugly_counter = 0;
 
     for r in tokens.iter() {
+        //println!("{:?}", r);
         result += match r {
             &reader::Token::Number(ref n) => " ".to_string() + n.to_string().as_ref(),
             &reader::Token::Symbol(ref n) => " ".to_string() + n.to_string().as_ref(),
@@ -16,8 +17,8 @@ pub fn pr_str(tokens: &Vec<reader::Token>) -> String {
                 match odd.as_ref() {
                     "'" => " (quote",
                     "`" => " (quasiquote",
-                    "~" => " (unquote",
                     "~@" => " (splice-unquote",
+                    "~" => " (unquote",
                     _ => panic!("unknown token {:?}", odd)
                 }.to_string()
             },
