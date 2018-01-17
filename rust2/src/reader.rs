@@ -41,6 +41,7 @@ pub enum Token {
     Keyword(String),
     Number(i32),
     List(Vec<Token>),
+    Odd(String),
     Vector(Vec<Token>),
     HashMap(Vec<Token>)
 }
@@ -74,7 +75,7 @@ pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
             }
         )
     }
-    //println!("{:?}", result);
+    println!("{:?}", result);
     result
 }
 
@@ -84,6 +85,11 @@ fn read_atom(reader : &mut Reader) -> Token {
 }
 
 fn _read_atom(s: &str) -> Token {
+    let odd_bit = regex!(r###"['`~(~@)]"###);
+    if let Some(odd) = odd_bit.find(s) {
+        return Token::Odd(odd.as_str().to_string());
+    }
+
     let keyword_regex = regex!(r":\w+[\w\d]*");
     let mat = keyword_regex.find(s);
     match mat {
@@ -108,10 +114,10 @@ fn _read_atom(s: &str) -> Token {
     }
 }
 
-fn update_state<'a>(s :&'a str, match_point : &Captures<'a>) -> (&'a str, &'a str) {
+fn update_state<'a>(s :&'a str, tokens :&mut Vec<String>, match_point : &Captures<'a>) -> &'a str {
     let new_s = &s[match_point.get(1).unwrap().end()..];
-    let to_add = match_point.get(1).unwrap().as_str();
-    (new_s, to_add) 
+    tokens.push(match_point.get(1).unwrap().as_str().to_string());
+    new_s
 }
 
 pub fn tokenizer(s_in: &str) -> Reader {
@@ -120,55 +126,23 @@ pub fn tokenizer(s_in: &str) -> Reader {
     let digits = regex!(r"^[\s,]*(-?\d+)");
     let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-\\])"); //{} is greedy to detect ** instead of: *
     let alphas = regex!(r###"^[\s,]*([\w\d:"-]+)"###);
+    let strings = regex!(r###"^[\s,]*("((\\")|[^"])+")"###);
+    let odd_shit = regex!(r###"^[\s,]*(['`])"###);
     let mut tokens = vec![];
+    let all_regexs = vec![&strings, &brackets, &odd_shit, &digits, &operands, &alphas] ;
 
-    while s.len() > 0 {
-        let rb = brackets.captures(s);
+    let empty = regex!(r"^[\s,]+$");
 
-        tokens.push( String::from(
-            match rb {
-                Some(bracket) => {
-                    let (ss, res) = update_state(s, &bracket);
-                    s = ss;
-                    res
-                },
-                _ => {
-                    let a_number = digits.captures(s);
-                    match a_number {
-                        Some(n) => {
-                            let (ss, res) = update_state(s, &n);
-                            s = ss;
-                            res
-                        },
-                        _ => {
-                            let a_symbol = operands.captures(s);
-                            match a_symbol {
-                                Some(sym) => {
-                                    let (ss, res) = update_state(s, &sym);
-                                    s = ss;
-                                    res
-                                },
-                                _ => {
-                                    let a_other = alphas.captures(s);
-                                    match a_other {
-                                        Some(alp) => {
-                                            let (ss, res) = update_state(s, &alp);
-                                            s = ss;
-                                            res
-                                        },
-                                        _ => {
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+    while s.len() > 0 && !empty.is_match(s) {
+
+        for regex in &all_regexs {
+            if let Some(rb) = regex.captures(s) {
+                println!("found with: {:?} {:?}", s, regex);
+                s = update_state(s, &mut tokens, &rb);
+                break
             }
-        ));
-    }
-
+        }
+    } 
     Reader{tokens: tokens, position: 0}
 }
 
@@ -180,14 +154,19 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("* 34 -4").tokens, vec!["*", "34", "-4"]);
     assert_eq!(tokenizer("*-34 4").tokens, vec!["*", "-34", "4"]);
     assert_eq!(tokenizer("** 1 2").tokens, vec!["**", "1", "2"]);
+    assert_eq!(tokenizer(":kw").tokens, vec![":kw"]);
     assert_eq!(tokenizer("(1 2, 3,,,,),,").tokens, vec!["(", "1", "2", "3", ")"]);
     assert_eq!(tokenizer("abc").tokens, vec!["abc"]);
     assert_eq!(tokenizer("\"abc (hi)\"").tokens, vec!["\"abc (hi)\""]);
+    assert_eq!(tokenizer("\"with \\\" a quote in\"").tokens, vec!["\"with \\\" a quote in\""]);
+    assert_eq!(tokenizer("'1").tokens, vec!["'", "1"]);
+    assert_eq!(tokenizer("`(1 2)").tokens, vec!["`", "(", "1", "2", ")"]);
 }
 
 #[test]
 fn test_read_atom() {
     assert_eq!(_read_atom(":hell33o "),  Token::Keyword(":hell33o".to_string()));
     assert_eq!(_read_atom("-898"),  Token::Number(-898));
+    assert_eq!(_read_atom("`"),  Token::Odd("`".to_string()));
 }
 

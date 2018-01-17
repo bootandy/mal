@@ -63,7 +63,7 @@ fn test_kw() {
 
 #[test]
 fn test_no_whitespace() {
-    assert_eq!(rep("\"abc\'"), "\"abc\"");
+    assert_eq!(rep("\"abc\""), "\"abc\"");
 }
 
 #[test]
