@@ -1,10 +1,11 @@
 
 use std::io;
 use std::io::Write;
+use std::collections::HashMap;
 
 mod reader;
 mod printer;
-
+mod eval;
 
 fn get_input() -> String  {
     let mut input = String::new();
@@ -19,8 +20,8 @@ fn get_input() -> String  {
     input
 }
 
-fn eval(s: Vec<String>)-> Vec<String> {
-    s
+fn eval(tokens: Vec<reader::Token>, enviro : &mut HashMap<reader::Token, eval::Callback>) -> Vec<reader::Token> {
+    vec![eval::apply_sym_wrapper(&tokens, enviro)]
 }
 
 fn print(data: Vec<reader::Token>) -> String {
@@ -32,9 +33,12 @@ fn read(s: &str) -> Vec<reader::Token> {
 }
 
 fn rep(s: &str) -> String {
+    let mut enviro : HashMap<reader::Token, eval::Callback> = HashMap::new();
+    //eval::setup_base_functions(&mut enviro);
+    
     let ss = read(s);
-    //println!("{:?}", ss);
-    print(ss)
+    let s_eval = eval(ss, &mut enviro);
+    print(s_eval)
 }
 
 pub fn main() {

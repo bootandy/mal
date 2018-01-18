@@ -33,7 +33,7 @@ impl Reader {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
     Symbol(String),
     Crap(),
@@ -124,7 +124,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
     let mut s = &s_in[0..];
     let brackets = regex!(r###"^[\s,]*([\(\)\{\}\[\]])[\s,]*"###);
     let digits = regex!(r"^[\s,]*(-?\d+)");
-    let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-\\])"); //{} is greedy to detect ** instead of: *
+    let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-/])"); //{} is greedy to detect ** instead of: *
     let alphas = regex!(r###"^[\s,]*([\w\d:"-]+)"###);
     let strings = regex!(r###"^[\s,]*("((\\")|[^"])*")"###);
     let odd_shit = regex!(r###"^[\s,]*((~@)|['`~])"###);
@@ -157,6 +157,7 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("34,4").tokens, vec!["34", "4"]);
     assert_eq!(tokenizer("* 34 -4").tokens, vec!["*", "34", "-4"]);
     assert_eq!(tokenizer("*-34 4").tokens, vec!["*", "-34", "4"]);
+    assert_eq!(tokenizer("/ 4 1").tokens, vec!["/", "4", "1"]);
     assert_eq!(tokenizer("** 1 2").tokens, vec!["**", "1", "2"]);
     assert_eq!(tokenizer(":kw").tokens, vec![":kw"]);
     assert_eq!(tokenizer("(1 2, 3,,,,),,").tokens, vec!["(", "1", "2", "3", ")"]);
