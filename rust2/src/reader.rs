@@ -75,12 +75,12 @@ pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
             }
         )
     }
-    println!("{:?}", result);
     result
 }
 
 fn read_atom(reader : &mut Reader) -> Token {
-    let s = &reader.next().unwrap();
+    // just trim gives me a &str
+    let s = &reader.next().unwrap().trim().to_string();
    
     if s == "def!"  || s == "def" {
         return Token::Keyword("def".to_string());
@@ -128,7 +128,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
     let brackets = regex!(r###"^[\s,]*([\(\)\{\}\[\]])[\s,]*"###);
     let digits = regex!(r"^[\s,]*(-?\d+)");
     let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-/])"); //{} is greedy to detect ** instead of: *
-    let alphas = regex!(r###"^[\s,]*([!\w\d:"-]+)"###);
+    let alphas = regex!(r###"^[\s,]*([!\w\d:"\-\*]+)"###);
     let strings = regex!(r###"^[\s,]*("((\\")|[^"])*")"###);
     let odd_shit = regex!(r###"^[\s,]*((~@)|['`~])"###);
     let comment = regex!(r###"^[\s,]*(;.*)$"###);

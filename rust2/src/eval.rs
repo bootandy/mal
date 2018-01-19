@@ -4,8 +4,29 @@ use reader;
 
 //pub type Callback = fn(reader::Token, &reader::Token) -> reader::Token;
 
+pub fn apply_sym_wrapper2(tokens : &[reader::Token], func_map: &mut HashMap<reader::Token, reader::Token>) -> reader::Token {
+    let hack = match tokens[0] {
+        reader::Token::List(ref sub_list) => apply_sym(None, None, reader::Token::List(vec![]), &sub_list, func_map),
+        _ => apply_sym(None, None, reader::Token::List(vec![]), &tokens, func_map),
+    };
+    match hack {
+        reader::Token::List(ref sub_list) => {
+            if sub_list.len() == 1 {
+                sub_list[0].clone()
+            } else {
+                hack.clone()
+            }
+        },
+        _ => hack.clone()
+    }
+            
+}
+
 pub fn apply_sym_wrapper(tokens : &[reader::Token], func_map: &mut HashMap<reader::Token, reader::Token>) -> reader::Token {
-    apply_sym(None, None, reader::Token::List(vec![]), &tokens, func_map)
+    match tokens[0] {
+        reader::Token::List(ref sub_list) => apply_sym(None, None, reader::Token::Other("".to_string()), &sub_list, func_map),
+        _ => apply_sym(None, None, reader::Token::Other("".to_string()), &tokens, func_map),
+    }
 }
 
 pub fn apply_sym(
@@ -16,6 +37,7 @@ pub fn apply_sym(
         func_map: &mut HashMap<reader::Token, reader::Token>
 ) -> reader::Token {
     let mut tokens = token_param;
+    //println!("apply_sym {:?}", token_param);
 
     if tokens.len() == 0 {
         match acc {
@@ -30,17 +52,37 @@ pub fn apply_sym(
                 "def" => {
                     let var_name = tokens[1].clone();
                     let var_value = tokens[2].clone();
-                    tokens = &tokens[2..]; // we will drop the first token in the vec when we recur
+                    tokens = &tokens[2..];   // we will drop the first token in the vec when we recur
                     func_map.insert(var_name, var_value.clone());
-                    println!("{:?}", func_map);
-                    apply_sym(None, None, reader::Token::List(vec![]), &vec![var_value], func_map)
+                    apply_sym_wrapper(&vec![var_value], func_map)
+                },
+                "let" => {
+                    let vars = match &tokens[1] {
+                        &reader::Token::List(ref list) => list.clone(),
+                        &reader::Token::Vector(ref list) => list.clone(),
+                        _ => panic!("Use of let requires a list")
+                    };
+                    let to_eval = &tokens[2];
+
+                    let mut count = 0;
+                    let mut new_func_map = func_map.clone();
+                    while count < vars.len() {
+                        let var_name = &vars[count];
+                        let var_value = &vars[count+1];
+                        new_func_map.insert(var_name.clone(), var_value.clone());
+                        count += 2;
+                    }
+                    tokens = &tokens[2..]; // we will drop the first token in the vec when we recur
+
+                    let res = apply_sym_wrapper(&vec![to_eval.clone()], &mut new_func_map);
+                    res
                 },
                 _ => panic!("Unknown keyword {:?}", keyword)
             }
         },
         &reader::Token::Other(_) => {
             if func_map.contains_key(&tokens[0]) {
-                apply_sym(None, None, reader::Token::List(vec![]), &vec![func_map[&tokens[0]].clone()], func_map)
+                apply_sym_wrapper(&vec![func_map[&tokens[0]].clone()], func_map)
             } else {
                 tokens[0].clone()
             }
@@ -74,37 +116,46 @@ pub fn apply_sym(
                 },
                 // No accumulator -> Lets populate it with the first value.
                 (None, reader::Token::Number(n2)) => n2,
-                (Some(_), _)  => panic!("cant add"),
+                (Some(_), x)  => panic!("cant add {:?}", x),
                 (_, _) => panic!("no")
             };
             return apply_sym(symbol, Some(new_acc), group_type, &tokens[1..], func_map)
         },
         
         None => {
-            if tokens.len() == 1 {
-                return to_add
-            }
-            // greedily eat list until a list object.
-            let ti = tokens[1..].iter();
-            let mut new_list = vec![to_add];
-            for nxt_token in ti {
-                new_list.push(
-                    match nxt_token {
-                        &reader::Token::List(ref list) => {
-                            apply_sym(None, None, reader::Token::List(vec![]),  &list, func_map)
-                        },
-                        &reader::Token::Vector(ref list) => {
-                            apply_sym(None, None, reader::Token::Vector(vec![]), &list, func_map)
-                        },
-                        &_ => nxt_token.clone()
-                    }
-                );
-            };
             match group_type {
-                reader::Token::List(_) => return reader::Token::List(new_list),
-                reader::Token::Vector(_) => return reader::Token::Vector(new_list),
-                reader::Token::HashMap(_) => return reader::Token::HashMap(new_list),
-                _ => panic!("Need to know which group type to use")
+                reader::Token::Other(_) => return to_add,
+                _ => {
+                    // greedily eat list until a list object.
+                    let ti = tokens[1..].iter();
+                    let mut new_list = vec![to_add];
+                    for nxt_token in ti {
+                        new_list.push(
+                            match nxt_token {
+                                &reader::Token::List(ref list) => {
+                                    apply_sym(None, None, reader::Token::List(vec![]),  &list, func_map)
+                                },
+                                &reader::Token::Vector(ref list) => {
+                                    apply_sym(None, None, reader::Token::Vector(vec![]), &list, func_map)
+                                },
+                                &reader::Token::Other(_) => {
+                                    if func_map.contains_key(&nxt_token) {
+                                        apply_sym_wrapper(&vec![func_map[&nxt_token].clone()], func_map)
+                                    } else {
+                                        tokens[0].clone()
+                                    }
+                                },
+                                &_ => nxt_token.clone()
+                            }
+                        );
+                    };
+                    match group_type {
+                        reader::Token::List(_) => return reader::Token::List(new_list),
+                        reader::Token::Vector(_) => return reader::Token::Vector(new_list),
+                        reader::Token::HashMap(_) => return reader::Token::HashMap(new_list),
+                        _ => panic!("Need to know which group type to use")
+                    }
+                }
             }
         }
     }
