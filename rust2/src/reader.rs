@@ -36,12 +36,12 @@ impl Reader {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
     Symbol(String),
-    Crap(),
     Other(String),
+    Odd(String),
     Keyword(String),
+    UserKeyword(String),
     Number(i32),
     List(Vec<Token>),
-    Odd(String),
     Vector(Vec<Token>),
     HashMap(Vec<Token>)
 }
@@ -75,16 +75,19 @@ pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
             }
         )
     }
-    //println!("{:?}", result);
+    println!("{:?}", result);
     result
 }
 
 fn read_atom(reader : &mut Reader) -> Token {
-    let s = reader.next().unwrap();
-    _read_atom(&s)
-}
-
-fn _read_atom(s: &str) -> Token {
+    let s = &reader.next().unwrap();
+   
+    if s == "def!"  || s == "def" {
+        return Token::Keyword("def".to_string());
+    }
+    if s == "let*" || s == "let" {
+        return Token::Keyword("let".to_string());
+    }
     let odd_bit = regex!(r###"(~@)|['`~]"###);
     if let Some(odd) = odd_bit.find(s) {
         return Token::Odd(odd.as_str().to_string());
@@ -93,7 +96,7 @@ fn _read_atom(s: &str) -> Token {
     let keyword_regex = regex!(r":\w+[\w\d]*");
     let mat = keyword_regex.find(s);
     match mat {
-        Some(m) => return Token::Keyword(m.as_str().to_string()),
+        Some(m) => return Token::UserKeyword(m.as_str().to_string()),
         _ => {
             let r = regex!(r"^\s*(?P<digits>-?\d+)$");
             let cap = r.find(s.as_ref());
@@ -125,7 +128,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
     let brackets = regex!(r###"^[\s,]*([\(\)\{\}\[\]])[\s,]*"###);
     let digits = regex!(r"^[\s,]*(-?\d+)");
     let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-/])"); //{} is greedy to detect ** instead of: *
-    let alphas = regex!(r###"^[\s,]*([\w\d:"-]+)"###);
+    let alphas = regex!(r###"^[\s,]*([!\w\d:"-]+)"###);
     let strings = regex!(r###"^[\s,]*("((\\")|[^"])*")"###);
     let odd_shit = regex!(r###"^[\s,]*((~@)|['`~])"###);
     let comment = regex!(r###"^[\s,]*(;.*)$"###);
@@ -167,12 +170,17 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("'1").tokens, vec!["'", "1"]);
     assert_eq!(tokenizer("`(1 2)").tokens, vec!["`", "(", "1", "2", ")"]);
     assert_eq!(tokenizer("1 ;some comment").tokens, vec!["1"]);
+    assert_eq!(tokenizer("def! sd 3").tokens, vec!["def!", "sd", "3"]);
+}
+
+fn atom_helper(s: &str) -> Reader {
+    Reader{tokens: vec![s.to_string()], position: 0}
 }
 
 #[test]
 fn test_read_atom() {
-    assert_eq!(_read_atom(":hell33o "),  Token::Keyword(":hell33o".to_string()));
-    assert_eq!(_read_atom("-898"),  Token::Number(-898));
-    assert_eq!(_read_atom("`"),  Token::Odd("`".to_string()));
+    assert_eq!(read_atom(&mut atom_helper(":hell33o ")),  Token::UserKeyword(":hell33o".to_string()));
+    assert_eq!(read_atom(&mut atom_helper("-898")),  Token::Number(-898));
+    assert_eq!(read_atom(&mut atom_helper("`")),  Token::Odd("`".to_string()));
 }
 
