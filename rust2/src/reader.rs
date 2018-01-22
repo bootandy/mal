@@ -110,6 +110,9 @@ fn read_atom(reader : &mut Reader) -> Token {
     if s == "if" {
         return Token::Keyword("if".to_string());
     }
+    if s == "fn" || s == "fn*" {
+        return Token::Keyword("fn".to_string());
+    }
 
     let odd_bit = regex!(r###"(~@)|['`~]"###);
     if let Some(odd) = odd_bit.find(s) {

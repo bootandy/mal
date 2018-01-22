@@ -3,21 +3,6 @@ use std::collections::HashMap;
 use reader;
 
 //pub type Callback = fn(reader::Token, &reader::Token) -> reader::Token;
-/*
-pub fn apply_sym_wrapper2(tokens : &mut Vec<reader::Token>, func_map: &mut HashMap<reader::Token, reader::Token>) -> reader::Token {
-    let head = &tokens[0];
-    return match head {
-        &reader::Token::List(ref sublist) => apply_sym(None, None, reader::Token::List(vec![]), &mut (sublist.clone()), func_map),
-        _ => apply_sym(None, None, reader::Token::List(vec![]), &mut tokens.clone(), func_map)
-    }
-}
-
-pub fn apply_sym_wrapper(tokens : &mut Vec<reader::Token>, func_map: &mut HashMap<reader::Token, reader::Token>) -> reader::Token {
-    if let reader::Token::List(ref sub_list) = tokens[0] {
-        return apply_sym(None, None, reader::Token::Other("".to_string()), &mut sub_list.clone(), func_map)
-    }
-    return apply_sym(None, None, reader::Token::Other("".to_string()), tokens, func_map)
-}*/
 
 pub fn apply_sym_multi(
         group_type: reader::Token,
@@ -28,9 +13,13 @@ pub fn apply_sym_multi(
     if tokens.len() == 0 {
         return reader::Token::List(vec![])
     }
-    let mut head = tokens.remove(0);
-    if let reader::Token::Keyword(keyword) = head {
-        head = _process_keyword(keyword.as_ref(), tokens, func_map);
+    let old_head = tokens.remove(0);
+    let head = {
+        if let reader::Token::Keyword(ref keyword) = old_head {
+            _process_keyword(keyword.as_ref(), tokens, func_map)
+        } else {
+            old_head
+        }
     };
     let head_applied = apply_sym_single(&head, func_map);
 
@@ -124,7 +113,7 @@ pub fn to_number(token: &reader::Token, func_map: &mut HashMap<reader::Token, re
 }
 
 fn _process_keyword(
-        keyword : &str,
+        keyword: &str,
         tokens: &mut Vec<reader::Token>, 
         func_map: &mut HashMap<reader::Token, reader::Token>
 ) -> reader::Token {
@@ -154,6 +143,12 @@ fn _process_keyword(
 
             let res = apply_sym_single(&to_eval, &mut new_func_map);
             res
+        },
+        "fn" => {
+            let params = tokens.remove(0);
+            let func_body = tokens.remove(0);
+            let mut new_func_map = func_map.clone();
+
         },
         "list?" => {
             match tokens.remove(0) {
@@ -222,11 +217,12 @@ fn _handle_comparison(keyword :&str, tokens: &mut Vec<reader::Token>, func_map: 
 }
 
 fn _is_true_comparison(comparison: &str, token_left: reader::Token, token_right: reader::Token) -> bool {
-    if comparison == "=" && token_left == token_right {
-        true
+    if comparison == "=" {
+        token_left == token_right 
     } else if (comparison == "<=" || comparison == ">=") && token_left == token_right {
         true
     } else {
+        // This let flips the tokens on a '>' so we can always compare as if a '<' 
         let (new_token_left, new_token_right) = {
             if comparison == ">" || comparison == ">=" {
                 (token_right, token_left)
@@ -253,7 +249,7 @@ fn _is_true(token: reader::Token) -> bool {
         },
         reader::Token::Number(n) => n != 0,
         reader::Token::List(sublist) => sublist.len() != 0,
-        _ => panic!("Uknown token generated in if {:?}", token)
+        _ => panic!("Uknown token passed to if {:?}", token)
     }
 }
             
@@ -265,5 +261,7 @@ fn test_handle_comparison() {
     assert!(!_is_true_comparison(">=", reader::Token::Number(5), reader::Token::Number(8)));
     assert!(_is_true_comparison(">=", reader::Token::Number(8), reader::Token::Number(8)));
     assert!(_is_true_comparison("<=", reader::Token::Number(8), reader::Token::Number(8)));
+    assert!(_is_true_comparison("=", reader::Token::Number(8), reader::Token::Number(8)));
+    assert!(!_is_true_comparison("=", reader::Token::Number(4), reader::Token::Number(8)));
 }
 
