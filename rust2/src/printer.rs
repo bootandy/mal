@@ -4,14 +4,15 @@ use reader;
 pub fn pr_str(tokens: &Vec<reader::Token>) -> String {
     let mut result = String::from("");
     let mut ugly_counter = 0;
-    //println!("print: {:?}", tokens);
 
     for r in tokens.iter() {
         result += match r {
             &reader::Token::Number(ref n) => " ".to_string() + n.to_string().as_ref(),
             &reader::Token::Symbol(ref n) => " ".to_string() + n.to_string().as_ref(),
             &reader::Token::UserKeyword(ref n) => " ".to_string() + n.to_string().as_ref(),
-            &reader::Token::Keyword(_) => "CAN NOT PRINT A LANG KEYWORD".to_string(),
+            &reader::Token::Keyword(ref n) => {
+                " ".to_string() + n.to_string().as_ref()
+            },
             &reader::Token::Other(ref n) => " ".to_string() + n.to_string().as_ref(),
             &reader::Token::Odd(ref odd) => {
                 ugly_counter = 2;

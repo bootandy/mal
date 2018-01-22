@@ -51,25 +51,23 @@ pub fn read_str(s :&str) -> Vec<Token> {
     read_form(&mut t, "")
 }
 
+fn _read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
+    r.next();
+    let to_add = read_form(r, close_char);
+    r.next();
+    to_add
+} 
+
 pub fn read_form(r: &mut Reader, close_char: &str) -> Vec<Token> {
     let mut result = vec![];
     while r.peek() != None && r.peek().unwrap() != close_char {
         result.push( 
             if r.peek().unwrap() == "(" {
-                r.next();
-                let to_add = Token::List(read_form(r, ")"));
-                r.next();
-                to_add
+                Token::List(_read_form(r, ")"))
             } else if r.peek().unwrap() == "{" {
-                r.next();
-                let to_add = Token::HashMap(read_form(r, "}"));
-                r.next();
-                to_add
+                Token::HashMap(_read_form(r, "}"))
             } else if r.peek().unwrap() == "[" {
-                r.next();
-                let to_add = Token::Vector(read_form(r, "]"));
-                r.next();
-                to_add
+                Token::Vector(_read_form(r, "]"))
             } else {
                 read_atom(r)
             }
@@ -88,6 +86,31 @@ fn read_atom(reader : &mut Reader) -> Token {
     if s == "let*" || s == "let" {
         return Token::Keyword("let".to_string());
     }
+    if s == "list" {
+        return Token::Keyword("list".to_string());
+    }
+    if s == "list?" {
+        return Token::Keyword("list?".to_string());
+    }
+    if s == "empty?" {
+        return Token::Keyword("empty?".to_string());
+    }
+    if s == "count" {
+        return Token::Keyword("count".to_string());
+    }
+    if s == "false" {
+        return Token::Keyword("false".to_string());
+    }
+    if s == "true" {
+        return Token::Keyword("true".to_string());
+    }
+    if s == "nil" {
+        return Token::Keyword("nil".to_string());
+    }
+    if s == "if" {
+        return Token::Keyword("if".to_string());
+    }
+
     let odd_bit = regex!(r###"(~@)|['`~]"###);
     if let Some(odd) = odd_bit.find(s) {
         return Token::Odd(odd.as_str().to_string());
@@ -99,8 +122,8 @@ fn read_atom(reader : &mut Reader) -> Token {
         Some(m) => return Token::UserKeyword(m.as_str().to_string()),
         _ => {
             let r = regex!(r"^\s*(?P<digits>-?\d+)$");
-            let cap = r.find(s.as_ref());
-            match cap {
+            let digits = r.find(s.as_ref());
+            match digits {
                 Some(x) => return Token::Number( i32::from_str(x.as_str()).unwrap() ),
                 _ =>  {
                     match s.as_ref() {
@@ -109,6 +132,11 @@ fn read_atom(reader : &mut Reader) -> Token {
                         "*" => Token::Symbol("*".to_string()),
                         "**" => Token::Symbol("**".to_string()),
                         "/" => Token::Symbol("/".to_string()),
+                        "=" => Token::Keyword("=".to_string()),
+                        ">" => Token::Keyword(">".to_string()),
+                        "<" => Token::Keyword("<".to_string()),
+                        ">=" => Token::Keyword(">=".to_string()),
+                        "<=" => Token::Keyword("<=".to_string()),
                         s => Token::Other(s.to_string())
                     }
                 }
@@ -125,15 +153,17 @@ fn update_state<'a>(s :&'a str, tokens :&mut Vec<String>, match_point : &Capture
 
 pub fn tokenizer(s_in: &str) -> Reader {
     let mut s = &s_in[0..];
+    // Idea: consider merging this with main tokenization method?
     let brackets = regex!(r###"^[\s,]*([\(\)\{\}\[\]])[\s,]*"###);
     let digits = regex!(r"^[\s,]*(-?\d+)");
     let operands = regex!(r"^[\s,]*(\*{1,2}|[\+\-/])"); //{} is greedy to detect ** instead of: *
-    let alphas = regex!(r###"^[\s,]*([!\w\d:"\-\*]+)"###);
+    let equalities = regex!(r"^[\s,]*((>=)|(<=)|[<>=])"); 
+    let alphas = regex!(r###"^[\s,]*([?!\w\d:"\-\*]+)"###);
     let strings = regex!(r###"^[\s,]*("((\\")|[^"])*")"###);
     let odd_shit = regex!(r###"^[\s,]*((~@)|['`~])"###);
     let comment = regex!(r###"^[\s,]*(;.*)$"###);
     let mut tokens = vec![];
-    let all_regexs = vec![&strings, &brackets, &odd_shit, &digits, &operands, &alphas] ;
+    let all_regexs = vec![&strings, &brackets, &odd_shit, &equalities, &digits, &operands, &alphas] ;
 
     let empty = regex!(r"^[\s,]+$");
 
@@ -149,7 +179,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
             }
         }
     } 
-    //println!("{:?}", tokens);
+    println!("tokenizer: {:?}", tokens);
     Reader{tokens: tokens, position: 0}
 }
 
