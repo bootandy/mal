@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
 use reader;
+use printer;
 
 //pub type Callback = fn(reader::Token, &reader::Token) -> reader::Token;
+
+// (def! sumdown (fn* (N) (if (> N 0) (+ N (sumdown  (- N 1))) 0)))
+// need to eagerly eval ^ before i save in func_map
 
 pub fn apply_sym_multi(
         group_type: reader::Token,
@@ -24,6 +28,40 @@ pub fn apply_sym_multi(
     let head_applied = apply_sym_single(&head, func_map);
 
     match head_applied {
+        reader::Token::Closure(contents) => {
+            let params = &contents[0];
+            let body = &contents[1];
+            let mut new_env = func_map.clone();
+
+            let mut param_iter = {
+                if let &reader::Token::Vector(ref param_list) = params {
+                    param_list.iter().peekable()
+                } else if let &reader::Token::List(ref param_list) = params {
+                    param_list.iter().peekable()
+                } else {
+                    panic!("first token after a func def must be a vector got: {:?}", params)
+                }
+            };
+
+            while tokens.len() > 0 && param_iter.peek().is_some() {
+                // Eagerly eval the contents of a function to allow recursion to work
+                // We need a rethink on eager vs lazy here.
+                let eval_now = apply_sym_single(&tokens.remove(0), func_map);
+                new_env.insert(param_iter.next().unwrap().clone(), eval_now);
+            }
+
+            if tokens.len() == 0 && param_iter.peek().is_none() {
+                println!("BUILD ENV: {:?}", new_env);
+                let r = apply_sym_single(body, &mut new_env);
+                println!("BUILT ENV: {:?}", new_env);
+                r
+            } else {
+                // Somehow we want to build a new closure with several params wired in.
+                println!("Return a closure {:?} enc: {:?}", contents, new_env);
+                reader::Token::Closure(contents.clone())
+            }
+        },
+
         reader::Token::Symbol(sym) => {
             let first = to_number(&mut tokens.remove(0), func_map);
 
@@ -86,7 +124,8 @@ pub fn apply_sym_single(
     match head {
         &reader::Token::Other(_) => {
             if func_map.contains_key(&head) {
-                apply_sym_single(&mut func_map[&head].clone(), func_map)
+                let tmp = &mut &func_map[&head].clone();
+                apply_sym_single(tmp, func_map)
             } else {
                 head.clone()
             }
@@ -148,7 +187,10 @@ fn _process_keyword(
             let params = tokens.remove(0);
             let func_body = tokens.remove(0);
             let mut new_func_map = func_map.clone();
-
+            reader::Token::Closure(vec![params, func_body])
+        },
+        "do" => {
+            apply_sym_single(&tokens.remove(0), func_map)
         },
         "list?" => {
             match tokens.remove(0) {
@@ -193,6 +235,10 @@ fn _process_keyword(
             } else {
                 apply_sym_single(&mut if_false, func_map)
             }
+        },
+        "prn" => {
+            println!("{:?}", printer::pr_str(&tokens.drain(..).collect()) );
+            reader::Token::Keyword("nil".to_string())
         },
         "false" => reader::Token::Keyword(keyword.to_string()),
         "true" => reader::Token::Keyword(keyword.to_string()),
@@ -252,6 +298,15 @@ fn _is_true(token: reader::Token) -> bool {
         _ => panic!("Uknown token passed to if {:?}", token)
     }
 }
+
+fn _remove_or_nil(tokens: &mut Vec<reader::Token>) -> reader::Token {
+    if tokens.len() > 0 {
+        tokens.remove(0)
+   } else {
+        reader::Token::Keyword("nil".to_string())
+   }
+}
+
             
 #[test]
 fn test_handle_comparison() {

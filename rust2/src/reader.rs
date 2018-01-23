@@ -41,6 +41,7 @@ pub enum Token {
     Keyword(String),
     UserKeyword(String),
     Number(i32),
+    Closure(Vec<Token>),
     List(Vec<Token>),
     Vector(Vec<Token>),
     HashMap(Vec<Token>)
@@ -112,6 +113,12 @@ fn read_atom(reader : &mut Reader) -> Token {
     }
     if s == "fn" || s == "fn*" {
         return Token::Keyword("fn".to_string());
+    }
+    if s == "do" {
+        return Token::Keyword("do".to_string());
+    }
+    if s == "prn" {
+        return Token::Keyword("prn".to_string());
     }
 
     let odd_bit = regex!(r###"(~@)|['`~]"###);
