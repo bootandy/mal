@@ -5,9 +5,6 @@ use printer;
 
 //pub type Callback = fn(reader::Token, &reader::Token) -> reader::Token;
 
-// (def! sumdown (fn* (N) (if (> N 0) (+ N (sumdown  (- N 1))) 0)))
-// need to eagerly eval ^ before i save in func_map
-
 pub fn apply_sym_multi(
         group_type: reader::Token,
         tokens : &mut Vec<reader::Token>, 
@@ -17,7 +14,7 @@ pub fn apply_sym_multi(
     if tokens.len() == 0 {
         return reader::Token::List(vec![])
     }
-    let old_head = tokens.remove(0);
+    let old_head = _remove_or_nil(tokens);
     let head = {
         if let reader::Token::Keyword(ref keyword) = old_head {
             _process_keyword(keyword.as_ref(), tokens, func_map)
@@ -53,7 +50,7 @@ pub fn apply_sym_multi(
             while tokens.len() > 0 && param_iter.peek().is_some() {
                 // Eagerly eval the contents of a function to allow recursion to work
                 // We need a rethink on eager vs lazy here.
-                let eval_now = apply_sym_single(&tokens.remove(0), func_map);
+                let eval_now = apply_sym_single(&_remove_or_nil(tokens), func_map);
                 let pn = param_iter.next().unwrap();
                 new_env.insert(pn.clone(), eval_now.clone());
             }
@@ -72,7 +69,7 @@ pub fn apply_sym_multi(
         },
 
         reader::Token::Symbol(sym) => {
-            let first = to_number(&mut tokens.remove(0), func_map);
+            let first = to_number(&mut _remove_or_nil(tokens), func_map);
 
             let n = match sym.as_ref() {
                 "+" => tokens.iter().fold(first, |a,b| { a + to_number(b, func_map) } ),
@@ -166,18 +163,18 @@ fn _process_keyword(
 ) -> reader::Token {
     match keyword {
         "def" => {
-            let var_name = tokens.remove(0);
-            let var_value = tokens.remove(0);
+            let var_name = _remove_or_nil(tokens);
+            let var_value = _remove_or_nil(tokens);
             func_map.insert(var_name, var_value.clone());
             apply_sym_single(&var_value, func_map)
         },
         "let" => {
-            let vars = match tokens.remove(0) {
+            let vars = match _remove_or_nil(tokens) {
                 reader::Token::List(ref list) => list.clone(),
                 reader::Token::Vector(ref list) => list.clone(),
                 _ => panic!("Use of let requires a list")
             };
-            let to_eval = tokens.remove(0);
+            let to_eval = _remove_or_nil(tokens);
 
             let mut count = 0;
             let mut new_func_map = func_map.clone();
@@ -192,22 +189,22 @@ fn _process_keyword(
             res
         },
         "fn" => {
-            let params = tokens.remove(0);
-            let func_body = tokens.remove(0);
+            let params = _remove_or_nil(tokens);
+            let func_body = _remove_or_nil(tokens);
             // I would like to clone the func_map env here instead - it feels better
             reader::Token::Closure(vec![params, func_body], vec![])
         },
         "do" => {
-            apply_sym_single(&tokens.remove(0), func_map)
+            apply_sym_single(&_remove_or_nil(tokens), func_map)
         },
         "list?" => {
-            match tokens.remove(0) {
+            match _remove_or_nil(tokens) {
                 reader::Token::List(_) => reader::Token::Keyword("true".to_string()),
                 _ => reader::Token::Keyword("false".to_string())
             }
         },
         "empty?" => {
-            match tokens.remove(0) {
+            match _remove_or_nil(tokens) {
                 reader::Token::List(sublist) => {
                     match sublist.len() {
                         0 => reader::Token::Keyword("true".to_string()),
@@ -224,19 +221,19 @@ fn _process_keyword(
             }
         },
         "count" => {
-            match tokens.remove(0) {
+            match _remove_or_nil(tokens) {
                 reader::Token::List(sublist) => reader::Token::Number(sublist.len() as i32),
                 reader::Token::Vector(sublist) => reader::Token::Number(sublist.len() as i32),
-                _ => panic!("Must call count? on a list")
+                _ => reader::Token::Number(0)
             }
         },
         "list" => {
             reader::Token::List(tokens.drain(..).collect())
         },
         "if"  => {
-            let mut if_to_eval = tokens.remove(0);
-            let mut if_true = tokens.remove(0);
-            let mut if_false = tokens.remove(0);
+            let mut if_to_eval = _remove_or_nil(tokens);
+            let mut if_true = _remove_or_nil(tokens);
+            let mut if_false = _remove_or_nil(tokens);
             
             if _is_true(apply_sym_single(&mut if_to_eval, func_map)) {
                 apply_sym_single(&mut if_true, func_map) 
@@ -261,8 +258,8 @@ fn _process_keyword(
 }
 
 fn _handle_comparison(keyword :&str, tokens: &mut Vec<reader::Token>, func_map: &mut HashMap<reader::Token, reader::Token>) -> reader::Token {
-    let mut first = tokens.remove(0);
-    let mut second = tokens.remove(0);
+    let mut first = _remove_or_nil(tokens);
+    let mut second = _remove_or_nil(tokens);
     if _is_true_comparison(keyword, apply_sym_single(&mut first, func_map), apply_sym_single(&mut second, func_map)){
         reader::Token::Keyword("true".to_string())
     } else {
@@ -293,6 +290,13 @@ fn _is_true_comparison(comparison: &str, token_left: reader::Token, token_right:
             
 fn _is_true(token: reader::Token) -> bool {
     match token {
+        reader::Token::Other(s) => {
+            match s.as_ref() {
+                "" => false,
+                "\"\"" => false,
+                _ => true
+            }
+        },
         reader::Token::Keyword(s) => {
             match s.as_ref() {
                 "false" => false,

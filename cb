@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+cd rust2
+cargo build --release
+cd ..
+mv rust2/target/release/rust2 rust2/target/release/step4_if_fn_do
+make "test^rust2^step4"
+

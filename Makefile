@@ -82,7 +82,7 @@ IMPLS = ada awk bash basic c chuck clojure coffee common-lisp cpp crystal cs d d
 	elisp elixir elm erlang es6 factor forth fsharp go groovy gst guile haskell \
 	haxe hy io java js julia kotlin livescript logo lua make mal matlab miniMAL \
 	nasm nim objc objpascal ocaml perl perl6 php pil plpgsql plsql powershell ps \
-	python r racket rexx rpython ruby rust scala scheme skew swift swift3 tcl \
+	python r racket rexx rpython ruby rust rust2 scala scheme skew swift swift3 tcl \
 	ts vb vhdl vimscript yorick
 
 EXTENSION = .mal
