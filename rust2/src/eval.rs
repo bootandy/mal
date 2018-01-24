@@ -30,7 +30,6 @@ pub fn apply_sym_multi(
     match head_applied {
         reader::Token::Closure(contents, new_map) => {
             let params = &contents[0];
-            println!("contentss: {:?}", contents);
             let body = &contents[1];
             let mut new_env = func_map.clone();
 

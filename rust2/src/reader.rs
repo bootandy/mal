@@ -31,6 +31,7 @@ impl Reader {
     }
 }
 
+// Next time these will be objects not enums
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
     Symbol(String),
