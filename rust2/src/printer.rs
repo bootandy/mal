@@ -13,7 +13,7 @@ pub fn pr_str(tokens: &Vec<reader::Token>) -> String {
             &reader::Token::Keyword(ref n) => {
                 " ".to_string() + n.to_string().as_ref()
             },
-            &reader::Token::Closure(_) => " #<function>".to_string(),
+            &reader::Token::Closure(_, _) => " #<function>".to_string(),
             &reader::Token::Other(ref n) => " ".to_string() + n.to_string().as_ref(),
             &reader::Token::Odd(ref odd) => {
                 ugly_counter = 2;

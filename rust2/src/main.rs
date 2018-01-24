@@ -35,7 +35,7 @@ fn read(s: &str) -> Vec<reader::Token> {
 
 fn rep(s: &str, enviro : &mut HashMap<reader::Token, reader::Token>) -> String {
     let ss = read(s);
-    println!("{:?}", ss);
+    //println!("{:?}", ss);
     let s_eval = eval(ss, enviro);
     print(s_eval)
 }
@@ -176,3 +176,24 @@ fn test_if_with_signs_and_defs() {
       assert_eq!(rep("(if (= a 4) 3 4)", &mut enviro), "3");
       assert_eq!(rep("(if (>a 2) 3 4)", &mut enviro), "3");
 }
+
+#[test]
+fn test_fn() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    assert_eq!(rep("( (fn* [a b] (+ a b)) 2 3)", &mut enviro), "5");
+}
+
+#[test]
+fn test_closure_fn() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    assert_eq!(rep("( ( (fn* (a) (fn* (b) (+ a b))) 5) 7)", &mut enviro), "12");
+}
+
+#[test]
+fn test_recursive_fn() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    rep("(def! sumdown (fn* (N) (if (> N 0) (+ N (sumdown  (- N 1))) 0)))", &mut enviro);
+    assert_eq!(rep("(sumdown 4", &mut enviro), "10");
+}
+
+

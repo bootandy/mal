@@ -3,8 +3,6 @@ use reader::regex::Captures;
 
 extern crate regex;
 
-//use regex;
-
 macro_rules! regex {
      ($e:expr) => (regex::Regex::new($e).unwrap())
 }
@@ -41,7 +39,7 @@ pub enum Token {
     Keyword(String),
     UserKeyword(String),
     Number(i32),
-    Closure(Vec<Token>),
+    Closure(Vec<Token>, Vec<(Token, Token)>),
     List(Vec<Token>),
     Vector(Vec<Token>),
     HashMap(Vec<Token>)
@@ -189,7 +187,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
             }
         }
     } 
-    println!("tokenizer: {:?}", tokens);
+    //println!("tokenizer: {:?}", tokens);
     Reader{tokens: tokens, position: 0}
 }
 
