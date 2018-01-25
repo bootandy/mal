@@ -196,6 +196,14 @@ fn test_closure_fn() {
 }
 
 #[test]
+fn test_func_in_a_func() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    rep("(def adder (fn* [a b] (+ a b)))", &mut enviro);
+    rep("(def add3 (adder 3))", &mut enviro);
+    assert_eq!(rep("(add3 4", &mut enviro), "7");
+}
+
+#[test]
 fn test_recursive_fn() {
     let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
     rep("(def! sumdown (fn* (N) (if (> N 0) (+ N (sumdown  (- N 1))) 0)))", &mut enviro);

@@ -25,27 +25,20 @@ pub fn apply_sym_multi(
     let head_applied = apply_sym_single(&head, func_map);
 
     match head_applied {
-        reader::Token::Closure(contents, new_map) => {
+        reader::Token::Closure(contents, env_as_tuple_list) => {
             let params = &contents[0];
             let body = &contents[1];
-            let mut new_env = func_map.clone();
+            let mut new_env : HashMap<reader::Token, reader::Token> = env_as_tuple_list.into_iter().collect();
 
             let mut param_iter = {
                 if let reader::Token::Vector(ref param_list) = *params {
-                    param_list.iter().peekable()
+                    param_list.into_iter().peekable()
                 } else if let reader::Token::List(ref param_list) = *params {
-                    param_list.iter().peekable()
+                    param_list.into_iter().peekable()
                 } else {
                     panic!("first token after a func def must be a vector got: {:?}", params)
                 }
             };
-
-            // Clone any values set by any parent closures
-            let mut clos_iter = new_map.iter().peekable();
-            while clos_iter.peek().is_some() {
-                let (key, value) = clos_iter.next().unwrap().clone();
-                new_env.insert(key, value);
-            }
 
             while !tokens.is_empty() && param_iter.peek().is_some() {
                 // Eagerly eval the contents of a function to allow recursion to work
@@ -58,13 +51,13 @@ pub fn apply_sym_multi(
             if tokens.is_empty() && param_iter.peek().is_none() {
                 apply_sym_single(body, &mut new_env)
             } else {
-                // Somehow we want to build a new closure with several params wired in.
-                // for each element if it is in new_env then replace it. 
-                let mut lst = vec![];
-                for (key,val) in func_map.iter() {
-                    lst.push((key.clone(), val.clone()));
-                }
-                reader::Token::Closure(contents.clone(), lst)
+                //contents must be rebuilt here to hold the new environment
+                // we really shouldn't have so many clones we could do this smarter
+                let contents2 = vec![reader::Token::List(param_iter.map(|a| {a.clone()}).collect()), body.clone()];
+                reader::Token::Closure(
+                    contents2,
+                    new_env.iter().map(|(a, b)| {(a.clone(), b.clone())}).collect()
+                )
             }
         },
 
@@ -190,8 +183,8 @@ fn _process_keyword(
         "fn" => {
             let params = _remove_or_nil(tokens);
             let func_body = _remove_or_nil(tokens);
-            // I would like to clone the func_map env here instead - it feels better
-            reader::Token::Closure(vec![params, func_body], vec![])
+            let lst = func_map.iter().map(|(a, b)| {(a.clone(), b.clone())}).collect();
+            reader::Token::Closure(vec![params, func_body], lst)
         },
         "do" => {
             apply_sym_single(&_remove_or_nil(tokens), func_map)
