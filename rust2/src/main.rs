@@ -6,6 +6,12 @@ use std::collections::HashMap;
 mod reader;
 mod printer;
 mod eval;
+/*
+ * for the re-write:
+ * tokens are objects not enums use inheritance
+ * be clear when eval()ing lazy or eager.
+ * pass system state down into functions
+ */
 
 fn get_input() -> String  {
     let mut input = String::new();
@@ -22,22 +28,22 @@ fn get_input() -> String  {
 
 fn eval(mut tokens: Vec<reader::Token>, enviro : &mut HashMap<reader::Token, reader::Token>) -> Vec<reader::Token> {
     //vec![eval::apply_sym_multi(reader::Token::List(vec![]), &mut tokens, enviro)]
-    vec![eval::apply_sym_single(&mut tokens.remove(0), enviro)]
+    vec![eval::apply_sym_single(&tokens.remove(0), enviro)]
 }
 
-fn print(data: Vec<reader::Token>) -> String {
-    return printer::pr_str(&data);
+fn print(data: &[reader::Token]) -> String {
+    printer::pr_str(data)
 }
 
 fn read(s: &str) -> Vec<reader::Token> {
-    return reader::read_str(s);
+    reader::read_str(s)
 }
 
 fn rep(s: &str, enviro : &mut HashMap<reader::Token, reader::Token>) -> String {
     let ss = read(s);
     //println!("{:?}", ss);
     let s_eval = eval(ss, enviro);
-    print(s_eval)
+    print(&s_eval)
 }
 
 pub fn main() {

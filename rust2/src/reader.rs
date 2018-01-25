@@ -128,12 +128,12 @@ fn read_atom(reader : &mut Reader) -> Token {
     let keyword_regex = regex!(r":\w+[\w\d]*");
     let mat = keyword_regex.find(s);
     match mat {
-        Some(m) => return Token::UserKeyword(m.as_str().to_string()),
+        Some(m) => Token::UserKeyword(m.as_str().to_string()),
         _ => {
             let r = regex!(r"^\s*(?P<digits>-?\d+)$");
             let digits = r.find(s.as_ref());
             match digits {
-                Some(x) => return Token::Number( i32::from_str(x.as_str()).unwrap() ),
+                Some(x) => Token::Number( i32::from_str(x.as_str()).unwrap() ),
                 _ =>  {
                     match s.as_ref() {
                         "+" => Token::Symbol("+".to_string()),
@@ -176,7 +176,7 @@ pub fn tokenizer(s_in: &str) -> Reader {
 
     let empty = regex!(r"^[\s,]+$");
 
-    while s.len() > 0 && !empty.is_match(s) {
+    while !s.is_empty() && !empty.is_match(s) {
 
         if let Some(the_comment) = comment.captures(s) {
             s = &s[the_comment.get(1).unwrap().end()..];
@@ -212,14 +212,14 @@ fn test_tokenizer() {
     assert_eq!(tokenizer("def! sd 3").tokens, vec!["def!", "sd", "3"]);
 }
 
-fn atom_helper(s: &str) -> Reader {
-    Reader{tokens: vec![s.to_string()], position: 0}
-}
 
 #[test]
 fn test_read_atom() {
-    assert_eq!(read_atom(&mut atom_helper(":hell33o ")),  Token::UserKeyword(":hell33o".to_string()));
-    assert_eq!(read_atom(&mut atom_helper("-898")),  Token::Number(-898));
-    assert_eq!(read_atom(&mut atom_helper("`")),  Token::Odd("`".to_string()));
+    fn _atom_helper(s: &str) -> Reader {
+        Reader{tokens: vec![s.to_string()], position: 0}
+    }
+    assert_eq!(read_atom(&mut _atom_helper(":hell33o ")),  Token::UserKeyword(":hell33o".to_string()));
+    assert_eq!(read_atom(&mut _atom_helper("-898")),  Token::Number(-898));
+    assert_eq!(read_atom(&mut _atom_helper("`")),  Token::Odd("`".to_string()));
 }
 
