@@ -297,7 +297,7 @@ fn _is_true(token: reader::Token) -> bool {
     }
 }
 
-fn _remove_or_nil(tokens: &mut Vec<reader::Token>) -> reader::Token {
+pub fn _remove_or_nil(tokens: &mut Vec<reader::Token>) -> reader::Token {
     if !tokens.is_empty() {
         tokens.remove(0)
    } else {

@@ -28,7 +28,7 @@ fn get_input() -> String  {
 
 fn eval(mut tokens: Vec<reader::Token>, enviro : &mut HashMap<reader::Token, reader::Token>) -> Vec<reader::Token> {
     //vec![eval::apply_sym_multi(reader::Token::List(vec![]), &mut tokens, enviro)]
-    vec![eval::apply_sym_single(&tokens.remove(0), enviro)]
+    vec![eval::apply_sym_single(&eval::_remove_or_nil(&mut tokens), enviro)]
 }
 
 fn print(data: &[reader::Token]) -> String {
@@ -55,6 +55,13 @@ pub fn main() {
         let buffer_trim = buffer.trim();
         println!("{}", rep(buffer_trim, &mut enviro))
     }
+}
+
+#[test]
+fn test_no_input() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    assert_eq!(rep("()", &mut enviro), "()");
+    rep("", &mut enviro); // check it doesn't crash on nothing 
 }
 
 #[test]
@@ -200,14 +207,20 @@ fn test_func_in_a_func() {
     let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
     rep("(def adder (fn* [a b] (+ a b)))", &mut enviro);
     rep("(def add3 (adder 3))", &mut enviro);
-    assert_eq!(rep("(add3 4", &mut enviro), "7");
+    assert_eq!(rep("(add3 4)", &mut enviro), "7");
 }
 
 #[test]
 fn test_recursive_fn() {
     let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
     rep("(def! sumdown (fn* (N) (if (> N 0) (+ N (sumdown  (- N 1))) 0)))", &mut enviro);
-    assert_eq!(rep("(sumdown 4", &mut enviro), "10");
+    assert_eq!(rep("(sumdown 4)", &mut enviro), "10");
 }
 
+#[test]
+fn test_recursive_fib() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    rep("(def! fib (fn* (a) (if (<= a 1) 1 (+ (fib(- a 1)) (fib(- a 2))) )))", &mut enviro);
+    assert_eq!(rep("(fib 5)", &mut enviro), "8");
+}
 
