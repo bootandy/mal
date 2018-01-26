@@ -53,7 +53,7 @@ pub fn apply_sym_multi(
             } else {
                 //contents must be rebuilt here to hold the new environment
                 // we really shouldn't have so many clones we could do this smarter
-                let contents2 = vec![reader::Token::List(param_iter.map(|a| {a.clone()}).collect()), body.clone()];
+                let contents2 = vec![reader::Token::List(param_iter.cloned().collect()), body.clone()];
                 reader::Token::Closure(
                     contents2,
                     new_env.iter().map(|(a, b)| {(a.clone(), b.clone())}).collect()
@@ -143,37 +143,35 @@ pub fn apply_symbol(
         tokens: &mut Vec<reader::Token>,
         func_map: &mut HashMap<reader::Token, reader::Token>
 ) -> reader::Token {
-    let the_first = apply_sym_single(&_remove_or_nil(tokens), func_map);
 
-    match the_first {
-        reader::Token::Number(first) => {
-            let mut sum = first;
-            for t in tokens {
-                let nxt = apply_sym_single(t, func_map);
-                match nxt {
-                    reader::Token::Number(n) => {
+    let mut sum :Option<i32> = None;
+    for t in tokens {
+        let nxt = apply_sym_single(t, func_map);
+        match nxt {
+            reader::Token::Number(n) => {
+                sum = Some(match sum {
+                    None => n,
+                    Some(sm) => {
                         match sym {
-                            "+" => sum += n, 
-                            "-" => sum -= n,
-                            "*" => sum *= n,
-                            "**" => sum = sum.pow(n as u32),
-                            "/" => sum /= n,
+                            "+" => sm + n, 
+                            "-" => sm - n,
+                            "*" => sm * n,
+                            "**" => sm.pow(n as u32),
+                            "/" => sm / n,
                             _  => {
                                 return reader::Token::Error(format!(
                                             "Unknown symbol: {}", sym
                                        ));
                             }
                         }
-                    },
-                    reader::Token::Error(_) => return nxt,
-                    _ => return reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, nxt))
-                }
-            }
-            reader::Token::Number(sum)
-        },
-        reader::Token::Error(_) => the_first,
-        _ => reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, the_first))
+                    }
+                });
+            },
+            reader::Token::Error(_) => return nxt,
+            _ => return reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, nxt))
+        }
     }
+    reader::Token::Number(sum.unwrap())
 }
 
 fn _process_keyword(
@@ -235,8 +233,9 @@ fn _process_keyword(
         },
         "count" => {
             match _remove_or_nil(tokens) {
-                reader::Token::List(sublist) => reader::Token::Number(sublist.len() as i32),
-                reader::Token::Vector(sublist) => reader::Token::Number(sublist.len() as i32),
+                reader::Token::List(sublist) | reader::Token::Vector(sublist) => {
+                    reader::Token::Number(sublist.len() as i32)
+                },
                 _ => reader::Token::Number(0)
             }
         },

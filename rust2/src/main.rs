@@ -48,6 +48,18 @@ fn rep(s: &str, enviro : &mut HashMap<reader::Token, reader::Token>) -> String {
 
 pub fn main() {
     let mut enviro  = HashMap::new();
+    println!("
+Hello welcome to my lisp.
+All commands are postfix 
+Commands: false, true, nil, prn, if, list, count, empty?, list?, do, fn, let, def
+Sample commands:
+(+ 3 4)   ; Add things 
+(def a 6) ; Define values / functions 
+(def fib (fn* (a) (if (<= a 1) 1 (+ (fib(- a 1)) (fib(- a 2))) ))) ; Fib function
+(fib a)
+
+    ");
+
     loop {
         print!("user> ");
         io::stdout().flush().unwrap();
