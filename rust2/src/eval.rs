@@ -61,8 +61,9 @@ pub fn apply_sym_multi(
             }
         },
 
-        reader::Token::Symbol(sym) => {
-            let first = to_number(&_remove_or_nil(tokens), func_map);
+        reader::Token::Symbol(ref sym) => {
+            apply_symbol(sym, tokens, func_map)
+            /*let first = to_number(&_remove_or_nil(tokens), func_map);
 
             let n = match sym.as_ref() {
                 "+" => tokens.iter().fold(first, |a,b| { a + to_number(b, func_map) } ),
@@ -72,7 +73,7 @@ pub fn apply_sym_multi(
                 "/" => tokens.iter().fold(first, |a,b| { a / to_number(b, func_map)}),
                 _  => panic!("unknown operator {:?}", sym)
             };
-            reader::Token::Number(n)
+            reader::Token::Number(n)*/
         },
         
         _ => {
@@ -125,27 +126,53 @@ pub fn apply_sym_single(
                 let tmp = &mut func_map[head].clone();
                 apply_sym_single(tmp, func_map)
             } else {
+                // Error here?
                 head.clone()
             }
         },
         reader::Token::List(ref list) => apply_sym_multi(&reader::Token::List(vec![]), &mut list.clone(), func_map),
         reader::Token::Vector(ref list) => apply_sym_multi(&reader::Token::Vector(vec![]), &mut list.clone(), func_map),
         reader::Token::HashMap(ref list) => apply_sym_multi(&reader::Token::HashMap(vec![]), &mut list.clone(), func_map),
-        reader::Token::Symbol(_) => {
-            /*if symbol.is_some() {
-                panic!("Bad syntax used a {:?} and a {:?}", sym, symbol);
-            }*/
-            head.clone()
-        },
         _ => head.clone()
     }
 }
 
-pub fn to_number(token: &reader::Token, func_map: &mut HashMap<reader::Token, reader::Token>) -> i32 {
-    let t2 = apply_sym_single(token, func_map);
-    match t2  {
-        reader::Token::Number(n) => n as i32,
-        _ => panic!("Need a number type token: {:?}", token)
+// This is like exploding out a fold to include errors, I couldn't get errors out of my fold
+pub fn apply_symbol(
+        sym: &str, 
+        tokens: &mut Vec<reader::Token>,
+        func_map: &mut HashMap<reader::Token, reader::Token>
+) -> reader::Token {
+    let the_first = apply_sym_single(&_remove_or_nil(tokens), func_map);
+
+    match the_first {
+        reader::Token::Number(first) => {
+            let mut sum = first;
+            for t in tokens {
+                let nxt = apply_sym_single(t, func_map);
+                match nxt {
+                    reader::Token::Number(n) => {
+                        match sym {
+                            "+" => sum += n, 
+                            "-" => sum -= n,
+                            "*" => sum *= n,
+                            "**" => sum = sum.pow(n as u32),
+                            "/" => sum /= n,
+                            _  => {
+                                return reader::Token::Error(format!(
+                                            "Unknown symbol: {}", sym
+                                       ));
+                            }
+                        }
+                    },
+                    reader::Token::Error(_) => return nxt,
+                    _ => return reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, nxt))
+                }
+            }
+            reader::Token::Number(sum)
+        },
+        reader::Token::Error(_) => the_first,
+        _ => reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, the_first))
     }
 }
 
@@ -316,5 +343,14 @@ fn test_handle_comparison() {
     assert!(_is_true_comparison("<=", reader::Token::Number(8), reader::Token::Number(8)));
     assert!(_is_true_comparison("=", reader::Token::Number(8), reader::Token::Number(8)));
     assert!(!_is_true_comparison("=", reader::Token::Number(4), reader::Token::Number(8)));
+}
+
+#[test]
+fn test_sum_bit() {
+    let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
+    assert_eq!(
+        apply_symbol("+", &mut vec![reader::Token::Number(5), reader::Token::Number(6)], &mut enviro), 
+        reader::Token::Number(11)
+    );
 }
 

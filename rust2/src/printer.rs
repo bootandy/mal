@@ -25,7 +25,8 @@ pub fn pr_str(tokens: &[reader::Token]) -> String {
             },
             reader::Token::List(ref list) => format!("({})", pr_str(list)),
             reader::Token::Vector(ref list) => format!("[{}]", pr_str(list)),
-            reader::Token::HashMap(ref list) => format!("{{{}}}", pr_str(list))
+            reader::Token::HashMap(ref list) => format!("{{{}}}", pr_str(list)),
+            reader::Token::Error(ref e) => format!("Error: {:?} ", e)
         }).as_ref();
         ugly_counter -= 1;
         if ugly_counter == 0 {

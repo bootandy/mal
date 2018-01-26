@@ -43,7 +43,8 @@ pub enum Token {
     Closure(Vec<Token>, Vec<(Token, Token)>),
     List(Vec<Token>),
     Vector(Vec<Token>),
-    HashMap(Vec<Token>)
+    HashMap(Vec<Token>),
+    Error(String),
 }
 
 pub fn read_str(s :&str) -> Vec<Token> {

@@ -65,7 +65,7 @@ fn test_no_input() {
 }
 
 #[test]
-fn test_ting() {
+fn test_basic() {
     let mut enviro : HashMap<reader::Token, reader::Token> = HashMap::new();
     assert_eq!(rep("(*-3 6)", &mut enviro), "-18");
 }
