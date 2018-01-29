@@ -63,17 +63,6 @@ pub fn apply_sym_multi(
 
         reader::Token::Symbol(ref sym) => {
             apply_symbol(sym, tokens, func_map)
-            /*let first = to_number(&_remove_or_nil(tokens), func_map);
-
-            let n = match sym.as_ref() {
-                "+" => tokens.iter().fold(first, |a,b| { a + to_number(b, func_map) } ),
-                "-" => tokens.iter().fold(first, |a,b| { a - to_number(b, func_map) } ),
-                "*" => tokens.iter().fold(first, |a,b| { a * to_number(b, func_map) } ),
-                "**" => tokens.iter().fold(first, |a,b| { a.pow( to_number(b, func_map) as u32) }),
-                "/" => tokens.iter().fold(first, |a,b| { a / to_number(b, func_map)}),
-                _  => panic!("unknown operator {:?}", sym)
-            };
-            reader::Token::Number(n)*/
         },
         
         _ => {
@@ -121,13 +110,12 @@ pub fn apply_sym_single(
 ) -> reader::Token {
 
     match *head {
-        reader::Token::Other(_) => {
+        reader::Token::Other(ref var_name) => {
             if func_map.contains_key(head) {
                 let tmp = &mut func_map[head].clone();
                 apply_sym_single(tmp, func_map)
             } else {
-                // Error here?
-                head.clone()
+                reader::Token::Error(format!("Unknown variable/definition: {}", var_name))
             }
         },
         reader::Token::List(ref list) => apply_sym_multi(&reader::Token::List(vec![]), &mut list.clone(), func_map),
@@ -137,41 +125,66 @@ pub fn apply_sym_single(
     }
 }
 
-// This is like exploding out a fold to include errors, I couldn't get errors out of my fold
+fn really_do_sym(sym : &str, sm : i32, n : i32) -> reader::Token {
+    match sym {
+        "+" => reader::Token::Number(sm + n), 
+        "-" => reader::Token::Number(sm - n),
+        "*" => reader::Token::Number(sm * n),
+        "**" => reader::Token::Number(sm.pow(n as u32)),
+        "/" => reader::Token::Number(sm / n),
+        _  => {
+            reader::Token::Error(format!( "Unknown symbol: {}", sym))
+        }
+    }
+}
+
+pub fn do_sym(sym: &str, a : Option<reader::Token>, b : reader::Token) -> reader::Token  {
+    match a {
+        None => b,
+        Some(some_a) => {
+            match (some_a, b) {
+                (reader::Token::Error(e), _) => reader::Token::Error(e),
+                (_, reader::Token::Error(e)) => reader::Token::Error(e),
+                (reader::Token::Number(sum), reader::Token::Number(n)) => {
+                    really_do_sym(sym, sum, n)
+                },
+                (reader::Token::Vector(sum), reader::Token::Vector(vec_parts)) => {
+                    reader::Token::Vector( vec_parts.into_iter().zip(sum).map(|(v, s)| { 
+                        do_sym(sym, Some(s), v)
+                    }).collect() )
+                },
+                (sum, reader::Token::Vector(vec_parts)) => {
+                    reader::Token::Vector( vec_parts.into_iter().map(|v| { 
+                        do_sym(sym, Some(sum.clone()), v)
+                    }).collect() )
+                },
+                (reader::Token::Vector(sum), any) => {
+                    reader::Token::Vector( sum.into_iter().map(|a| { 
+                        do_sym(sym, Some(a), any.clone())
+                    }).collect() )
+                },
+                (any_a, any_b) => reader::Token::Error(format!("Could not match types ({:?} {} {:?})", any_a.clone(), sym, any_b.clone()))
+            }
+        }
+    }
+}
+
 pub fn apply_symbol(
         sym: &str, 
         tokens: &mut Vec<reader::Token>,
         func_map: &mut HashMap<reader::Token, reader::Token>
 ) -> reader::Token {
-
-    let mut sum :Option<i32> = None;
-    for t in tokens {
+    let mut sum = None;
+    for t in tokens { 
         let nxt = apply_sym_single(t, func_map);
         match nxt {
-            reader::Token::Number(n) => {
-                sum = Some(match sum {
-                    None => n,
-                    Some(sm) => {
-                        match sym {
-                            "+" => sm + n, 
-                            "-" => sm - n,
-                            "*" => sm * n,
-                            "**" => sm.pow(n as u32),
-                            "/" => sm / n,
-                            _  => {
-                                return reader::Token::Error(format!(
-                                            "Unknown symbol: {}", sym
-                                       ));
-                            }
-                        }
-                    }
-                });
-            },
-            reader::Token::Error(_) => return nxt,
-            _ => return reader::Token::Error(format!( "Error applying symbol: {} to {:?}", sym, nxt))
+            reader::Token::Error(e) => return reader::Token::Error(e),
+            _ => { 
+                sum = Some(do_sym(sym, sum, nxt));
+            }
         }
     }
-    reader::Token::Number(sum.unwrap())
+    sum.unwrap()
 }
 
 fn _process_keyword(
@@ -342,6 +355,42 @@ fn test_handle_comparison() {
     assert!(_is_true_comparison("<=", reader::Token::Number(8), reader::Token::Number(8)));
     assert!(_is_true_comparison("=", reader::Token::Number(8), reader::Token::Number(8)));
     assert!(!_is_true_comparison("=", reader::Token::Number(4), reader::Token::Number(8)));
+}
+
+#[test]
+fn test_do_sym() {
+    assert_eq!(
+        do_sym("+", Some(reader::Token::Number(5)), reader::Token::Number(6)),
+        reader::Token::Number(11)
+    );
+}
+
+#[test]
+fn test_do_sym_vec_first() {
+    assert_eq!(
+        do_sym("*", Some(reader::Token::Vector(vec![reader::Token::Number(5), reader::Token::Number(6)])), 
+               reader::Token::Number(2)),
+        reader::Token::Vector(vec![reader::Token::Number(10), reader::Token::Number(12)])
+    );
+}
+
+#[test]
+fn test_do_sym_vec_last() {
+    assert_eq!(
+        do_sym("-", Some(reader::Token::Number(3)), 
+               reader::Token::Vector(vec![reader::Token::Number(5), reader::Token::Number(6)])), 
+        reader::Token::Vector(vec![reader::Token::Number(-2), reader::Token::Number(-3)])
+    );
+}
+
+#[test]
+fn test_do_sym_vec() {
+    assert_eq!(
+        do_sym("/", 
+               Some(reader::Token::Vector(vec![reader::Token::Number(50), reader::Token::Number(60)])), 
+               reader::Token::Vector(vec![reader::Token::Number(2), reader::Token::Number(6)])), 
+        reader::Token::Vector(vec![reader::Token::Number(25), reader::Token::Number(10)])
+    );
 }
 
 #[test]
